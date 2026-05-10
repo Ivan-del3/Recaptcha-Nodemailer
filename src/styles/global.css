@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* ─── BASE ─────────────────────────────────────── */
+.global-style {
+  @apply min-h-screen font-sans text-sm antialiased bg-stone-100 text-stone-700;
+}
+
+/* ─── HEADER ────────────────────────────────────── */
+.header-style {
+  @apply sticky top-0 z-50 border-b border-stone-300 bg-stone-100/90 backdrop-blur-md shadow-sm;
+}
+
+.nav-main {
+  @apply flex items-center gap-1;
+}
+
+.nav-link {
+  @apply px-4 py-1.5 text-xs tracking-wide uppercase text-stone-500
+         border border-transparent rounded
+         transition-all duration-200
+         hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50;
+}
+
+/* ─── MAIN ──────────────────────────────────────── */
+.main-container {
+  @apply py-16 px-4;
+}
+
+/* ─── FOOTER ─────────────────────────────────────── */
+.site-footer {
+  @apply text-center py-6 text-xs border-t border-stone-300 text-stone-400 tracking-wide;
+}
+
+/* ─── BADGE ──────────────────────────────────────── */
+.terminal-badge {
+  @apply inline-flex items-center gap-2 text-xs tracking-widest uppercase mb-4
+         px-3 py-1 text-amber-700
+         border border-amber-300 bg-amber-100 rounded-full;
+}
+
+/* ─── BOX ────────────────────────────────────────── */
+.box-style {
+  @apply p-8 border border-stone-300 rounded-xl bg-stone-50 shadow-sm;
+}
+
+/* ─── FORM ───────────────────────────────────────── */
+.contact-label {
+  @apply flex flex-col gap-1.5 text-xs font-semibold tracking-wide uppercase text-stone-500;
+}
+
+.contact-input {
+  @apply w-full px-3 py-2.5 text-sm
+         bg-white text-stone-700
+         border border-stone-300 rounded-lg outline-none
+         placeholder:text-stone-300
+         transition-all duration-150
+         focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100;
+}
+
+.contact-textarea {
+  @apply w-full px-3 py-2.5 text-sm resize-none
+         bg-white text-stone-700
+         border border-stone-300 rounded-lg outline-none
+         placeholder:text-stone-300
+         leading-relaxed
+         transition-all duration-150
+         focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100;
+}
+
+/* ─── ALERTS ─────────────────────────────────────── */
+.contact-alert {
+  @apply text-xs px-4 py-3 mb-5 border-l-2 rounded-lg leading-relaxed;
+}
+
+.contact-alert-error {
+  @apply bg-red-50 border-l-red-400 text-red-700;
+}
+
+.contact-alert-success {
+  @apply bg-green-50 border-l-green-400 text-green-700;
+}
+
+/* ─── FLOW STEPS ─────────────────────────────────── */
+.flow-step {
+  @apply p-5 border border-stone-300 rounded-xl bg-stone-50 shadow-sm
+         transition-all duration-200
+         hover:border-amber-300 hover:shadow-md;
+}
+
+.flow-step-num {
+  @apply text-[0.65rem] tracking-widest uppercase text-amber-500 font-bold mb-1;
+}
+
+.flow-step-title {
+  @apply font-semibold text-sm text-stone-700 mb-1.5;
+}
+
+.flow-step-desc {
+  @apply text-xs leading-relaxed text-stone-500;
+}
+
+/* ─── SUBMIT ─────────────────────────────────────── */
+.submit-btn {
+  @apply w-full py-3 text-xs tracking-widest uppercase font-bold cursor-pointer
+         border border-amber-500 rounded-lg
+         bg-amber-500 text-white
+         transition-all duration-200
+         hover:bg-amber-600 hover:border-amber-600 hover:shadow-md
+         disabled:cursor-not-allowed disabled:opacity-40
+         disabled:bg-stone-100 disabled:text-stone-400 disabled:border-stone-200;
+}

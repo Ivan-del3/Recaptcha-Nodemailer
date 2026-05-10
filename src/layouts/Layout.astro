@@ -1,0 +1,46 @@
+---
+import { ClientRouter } from "astro:transitions";
+import "../styles/global.css";
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>reCAPTCHA v2 — Demo</title>
+    <ClientRouter />
+  </head>
+
+  <body class="global-style">
+
+    <header class="header-style">
+      <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+          <span class="text-xs tracking-widest uppercase text-slate-400">
+            recaptcha<span class="text-amber-600">.demo</span>
+          </span>
+        </div>
+
+        <nav class="nav-main">
+          <a href="/" class="nav-link">Iván Delgado Alcobenda</a>
+        </nav>
+
+      </div>
+    </header>
+
+    <main class="main-container">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      recaptcha-v2 demo &nbsp;·&nbsp; nodemailer + sendgrid &nbsp;·&nbsp;
+      <span class="text-amber-400">astro 5</span>
+    </footer>
+
+  </body>
+</html>
