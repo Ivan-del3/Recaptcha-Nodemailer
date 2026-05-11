@@ -38,6 +38,10 @@ export const server = {
       }
 
       // Validar reCAPTCHA
+      // extrae el token del formulario y lo manda a Google junto con 
+      // la clave secreta; si Google no confirma que es válido, 
+      // el servidor corta la ejecución y el correo nunca se envía.
+      
       const recaptchaToken = formData.get("g-recaptcha-response")?.toString();
       const recaptchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
         method: "POST",

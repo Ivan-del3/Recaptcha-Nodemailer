@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 
+// SubmitButton mantiene el botón desactivado hasta recibir la confirmación de que 
+// el usuario completó el reCAPTCHA, y una vez enviado el formulario se bloquea 
+// para evitar envíos duplicados
+
 export default function SubmitButton() {
   const [enabled, setEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);

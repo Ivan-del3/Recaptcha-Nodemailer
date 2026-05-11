@@ -1,6 +1,11 @@
+// Exportamos la función que llamaremos desde otros archivos
+// Carga el script de recaptcha una sola vez
 export function loadRecaptcha() {
+
+  // Si ya hay una promesa, return (SINGLETON)
   if (window._grecaptchaPromise) return window._grecaptchaPromise;
 
+  // Creamos la promesa y la guardamos en window para que persista.
   window._grecaptchaPromise = new Promise((resolve, reject) => {
     const scriptId = "recaptcha-script";
 
@@ -28,3 +33,5 @@ export function loadRecaptcha() {
 
   return window._grecaptchaPromise;
 }
+
+// Inserta el script de Google en el DOM para poder usar su API

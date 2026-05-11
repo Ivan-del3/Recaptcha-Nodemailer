@@ -1,417 +1,111 @@
-# reCAPTCHA v2 en este proyecto
-
-Guía completa sobre cómo funciona Google reCAPTCHA v2 en este formulario de contacto: desde crear la cuenta hasta seguir el token a través de cada archivo del código.
+# reCAPTCHA v2 — Formulario de contacto con Astro
 
 ---
 
-## Índice
+## 1. Contexto del servicio: qué es y quién ofrece este servicio
 
-1. [Qué es reCAPTCHA v2 y por qué dos claves](#1-qué-es-recaptcha-v2-y-por-qué-dos-claves)
-2. [Crear cuenta y obtener las claves](#2-crear-cuenta-y-obtener-las-claves)
-3. [Configurar las variables de entorno](#3-configurar-las-variables-de-entorno)
-4. [Cómo se usa reCAPTCHA en cada archivo](#4-cómo-se-usa-recaptcha-en-cada-archivo)
-   - [recaptchaLoader.js — carga del script de Google](#41-recaptchaloaderjs--carga-del-script-de-google)
-   - [Recaptcha.jsx — el widget visual](#42-recaptchajsx--el-widget-visual)
-   - [index.astro — el formulario y el input oculto](#43-indexastro--el-formulario-y-el-input-oculto)
-   - [SubmmitButton.jsx — el botón controlado por reCAPTCHA](#44-submmitbuttonjsx--el-botón-controlado-por-recaptcha)
-   - [actions/index.ts — verificación en el servidor](#45-actionsindexts--verificación-en-el-servidor)
-5. [Flujo completo del token](#5-flujo-completo-del-token)
-6. [Por qué el token solo se usa una vez](#6-por-qué-el-token-solo-se-usa-una-vez)
-7. [Problemas frecuentes con reCAPTCHA](#7-problemas-frecuentes-con-recaptcha)
+**reCAPTCHA** es un servicio gratuito desarrollado y mantenido por **Google** cuyo propósito es distinguir usuarios humanos de bots automatizados. Google lo adquirió en 2009 y desde entonces lo ha integrado en su ecosistema de seguridad web.
 
----
+El servicio se consume a través de la **Google reCAPTCHA API**, accesible desde la consola de administración en `google.com/recaptcha/admin`. Desde ahí se registran los sitios, se obtienen las claves y se accede a los paneles de análisis de tráfico.
 
-## 1. Qué es reCAPTCHA v2 y por qué dos claves
+**Variantes disponibles actualmente:**
 
-reCAPTCHA v2 es un servicio de Google que muestra el checkbox "No soy un robot". Cuando el usuario lo completa, Google emite un **token temporal** que prueba que pasó la verificación.
+| Variante | Descripción |
+|---|---|
+| **reCAPTCHA v2 Checkbox** | Muestra el checkbox "No soy un robot". El usuario interactúa explícitamente. |
+| **reCAPTCHA v2 Invisible** | Sin checkbox visible; lanza el desafío solo cuando Google detecta comportamiento sospechoso. |
+| **reCAPTCHA v3** | No interrumpe al usuario. Asigna una puntuación de 0.0 a 1.0 de probabilidad de ser humano. El desarrollador decide qué hacer con esa puntuación. |
+| **reCAPTCHA Enterprise** | Versión de pago con mayor precisión, métricas avanzadas, y SLA de Google Cloud. Orientada a e-commerce, banca y grandes plataformas. |
 
-El sistema usa **dos claves distintas** con responsabilidades opuestas:
-
-| Clave | Nombre en Google | Variable en este proyecto | Dónde vive |
-|---|---|---|---|
-| **Site key** (pública) | Clave del sitio | `PUBLIC_RECAPTCHA_SITE_KEY` | Navegador — se incluye en el HTML |
-| **Secret key** (privada) | Clave secreta | `RECAPTCHA_SECRET` | Servidor — nunca sale del backend |
-
-La **site key** identifica tu sitio ante Google y permite renderizar el widget en el navegador. No importa que sea visible: por sí sola no sirve para falsificar tokens.
-
-La **secret key** se usa en el servidor para preguntarle a Google "¿este token que me mandó el usuario es legítimo?". Si esta clave se filtrara al cliente, cualquiera podría verificar tokens arbitrarios y saltarse la protección.
-
-> En Astro, las variables con prefijo `PUBLIC_` están disponibles en el navegador vía `import.meta.env`. Las variables sin ese prefijo son exclusivamente del servidor y nunca se incluyen en el bundle del cliente.
+Este proyecto usa **reCAPTCHA v2 Checkbox**, la variante con acción explícita del usuario.
 
 ---
 
-## 2. Crear cuenta y obtener las claves
+## 2. ¿Por qué este servicio?
 
-### Paso 1 — Ir a la consola de reCAPTCHA
+**Problema que resuelve:** Un formulario de contacto sin protección es trivialmente abusable por scripts automatizados que envían spam, saturan el servidor o realizan ataques de enumeración.
 
-Ve a [google.com/recaptcha/admin](https://www.google.com/recaptcha/admin) e inicia sesión con tu cuenta de Google.
+**Por qué reCAPTCHA v2 y no otra variante:**
 
-### Paso 2 — Registrar un sitio nuevo
+- **v2 Checkbox** exige una acción consciente del usuario antes de poder enviar. Para un formulario de contacto, esta fricción mínima es aceptable y comunica visualmente que el sitio está protegido.
+- **v3** no requiere interacción, pero delega en el desarrollador la lógica de decidir si la puntuación es suficiente. Añade complejidad sin una ventaja clara para un formulario de contacto sencillo.
+- **Enterprise** tiene coste económico y está dimensionado para volúmenes de tráfico y requisitos de cumplimiento que no aplican a este proyecto.
 
-Haz clic en el botón **+** (crear nuevo sitio) y rellena el formulario:
+**Por qué Google y no una alternativa:**
 
-**Etiqueta**
-Un nombre descriptivo solo para ti. Ejemplo: `mi-portfolio-contacto`.
-
-**Tipo de reCAPTCHA**
-Selecciona **reCAPTCHA v2** → **"No soy un robot" Checkbox**.
-
-> Existen otras variantes (v2 Invisible, v3, Enterprise). Este proyecto usa específicamente la v2 Checkbox porque el formulario requiere una acción explícita del usuario antes de poder enviar.
-
-**Dominios**
-Añade todos los dominios donde usarás el formulario. Puedes añadir varios:
-
-```
-localhost
-tudominio.com
-www.tudominio.com
-```
-
-`localhost` es imprescindible para que el widget funcione durante el desarrollo local. Sin él, el widget cargará pero fallará silenciosamente al verificar.
-
-**Propietarios**
-Tu cuenta de Google ya aparece por defecto. No es necesario cambiar nada.
-
-**Acepta las condiciones** y haz clic en **Enviar**.
-
-### Paso 3 — Copiar las claves
-
-Tras crear el sitio, Google muestra inmediatamente las dos claves:
-
-```
-Clave del sitio:  6LeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-Clave secreta:    6LeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-```
-
-Cópialas ahora. Siempre puedes volver a esta pantalla desde la consola de reCAPTCHA si las necesitas de nuevo.
-
-### Paso 4 — Añadir dominios posteriores (si es necesario)
-
-Si después necesitas añadir un dominio de producción que no registraste al principio:
-
-1. En la consola de reCAPTCHA, selecciona tu sitio.
-2. Ve al icono de configuración (engranaje).
-3. En la sección **Dominios**, añade el nuevo dominio y guarda.
-
-Los cambios de dominio tardan unos minutos en propagarse.
+- Tasa de reconocimiento casi universal: los usuarios saben qué es el checkbox y cómo completarlo.
+- La infraestructura de análisis de comportamiento de Google (movimiento del ratón, historial del navegador, patrones de clic) es más robusta que la de competidores open-source como hCaptcha o Friendly Captcha.
+- Integración directa: el SDK oficial de JavaScript está alojado en CDN de Google y no requiere ninguna dependencia en `package.json`.
 
 ---
 
-## 3. Configurar las variables de entorno
+## 3. Especificación de la API
 
-Crea o edita el archivo `.env` en la raíz del proyecto:
+reCAPTCHA v2 expone dos superficies de API distintas: una en el **cliente** (JavaScript) y otra en el **servidor** (HTTP).
 
-```env
-PUBLIC_RECAPTCHA_SITE_KEY=6LeXXX...   # Clave del sitio (pública, va al navegador)
-RECAPTCHA_SECRET=6LeXXX...            # Clave secreta (solo servidor)
+### 3.1 API de cliente — `api.js`
+
+Se carga con una etiqueta `<script>` apuntando a:
+
+```
+https://www.google.com/recaptcha/api.js
 ```
 
-Verifica que `.env` está en `.gitignore` para no subir las claves al repositorio.
+**Parámetro clave:** `?render=explicit`
 
----
-
-## 4. Cómo se usa reCAPTCHA en cada archivo
-
-### 4.1 `recaptchaLoader.js` — carga del script de Google
-
-**Ruta:** `src/utils/recaptchaLoader.js`
+Por defecto, el script busca automáticamente elementos `<div class="g-recaptcha">` en el DOM y renderiza el widget ahí. Con `render=explicit` este comportamiento se desactiva y el control pasa completamente al código:
 
 ```js
-export function loadRecaptcha() {
-  if (window._grecaptchaPromise) return window._grecaptchaPromise;
-
-  window._grecaptchaPromise = new Promise((resolve, reject) => {
-    const scriptId = "recaptcha-script";
-
-    const onLoad = () => {
-      if (window.grecaptcha?.ready) {
-        window.grecaptcha.ready(() => resolve(window.grecaptcha));
-      } else {
-        reject(new Error("grecaptcha no se inicializó correctamente"));
-      }
-    };
-
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
-      script.async = true;
-      script.defer = true;
-      script.onload = onLoad;
-      script.onerror = reject;
-      document.body.appendChild(script);
-    } else {
-      onLoad();
-    }
-  });
-
-  return window._grecaptchaPromise;
-}
+window.grecaptcha.render(elementoDOM, opciones)
 ```
 
-**Qué hace:**
-
-Este módulo carga dinámicamente el script de la API de reCAPTCHA de Google (`api.js`). El parámetro `?render=explicit` le dice a Google que **no renderice el widget automáticamente** — el código lo hará manualmente llamando a `grecaptcha.render()`. Esto da control total sobre dónde y cuándo aparece el widget.
-
-**El patrón singleton:**
-
-La función guarda la promesa en `window._grecaptchaPromise`. Si `Recaptcha.jsx` se monta dos veces (por ejemplo, por hot reload en desarrollo), la segunda llamada reutiliza la promesa existente en lugar de insertar el script de Google por duplicado. Insertar el script dos veces causaría errores en el objeto `grecaptcha`.
-
-**La espera con `grecaptcha.ready()`:**
-
-El script de Google puede estar en el DOM pero aún no haber terminado de inicializar su API interna. `grecaptcha.ready(callback)` garantiza que la API está lista antes de devolver el objeto `grecaptcha`. Sin esta espera, llamar a `grecaptcha.render()` inmediatamente después de que el script carga puede fallar.
-
----
-
-### 4.2 `Recaptcha.jsx` — el widget visual
-
-**Ruta:** `src/components/Recaptcha.jsx`
-
-```jsx
-import React, { useEffect, useRef, useState } from "react";
-import { loadRecaptcha } from "../utils/recaptchaLoader";
-
-export default function Recaptcha({ siteKey }) {
-  const containerRef = useRef(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const target = document.createElement("div");
-
-    if (containerRef.current) {
-      containerRef.current.innerHTML = "";
-      containerRef.current.appendChild(target);
-    }
-
-    loadRecaptcha().then((grecaptcha) => {
-      if (cancelled || !containerRef.current) return;
-
-      const isMobile = window.innerWidth < 550;
-
-      grecaptcha.render(target, {
-        sitekey: siteKey,
-        size: isMobile ? "compact" : "normal",
-        callback: (token) => {
-          const input = document.getElementById("g-recaptcha-response");
-          if (input) input.value = token;
-          window.__recaptchaVerified = true;
-          window.dispatchEvent(new CustomEvent("recaptcha:verified", { detail: token }));
-        },
-        "expired-callback": () => {
-          const input = document.getElementById("g-recaptcha-response");
-          if (input) input.value = "";
-          window.__recaptchaVerified = false;
-          window.dispatchEvent(new CustomEvent("recaptcha:expired"));
-        },
-      });
-
-      if (!cancelled) setReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-      if (containerRef.current) containerRef.current.innerHTML = "";
-    };
-  }, [siteKey]);
-
-  useEffect(() => {
-    window.__recaptchaVerified = false;
-  }, []);
-
-  return (
-    <div style={{ padding: "10px 0", display: "flex", justifyContent: "center", width: "100%", overflowX: "auto" }}>
-      {!ready && <div>Cargando validación...</div>}
-      <div ref={containerRef}></div>
-    </div>
-  );
-}
-```
-
-**Qué hace con reCAPTCHA:**
-
-Este componente es el único responsable de mostrar el widget y capturar el token. Recibe la `siteKey` como prop (que proviene de `PUBLIC_RECAPTCHA_SITE_KEY` en el entorno) y la pasa a `grecaptcha.render()`.
-
-**`grecaptcha.render(target, opciones)`** — renderiza el widget de Google en el elemento DOM `target`. Las opciones clave son:
-
-- `sitekey`: la clave pública que identifica tu sitio ante Google.
-- `size`: `"normal"` (widget completo) o `"compact"` (versión reducida para móviles, activada cuando el ancho de pantalla es menor de 550 px).
-- `callback`: función que Google llama **cuando el usuario completa el checkbox con éxito**. Recibe el **token** como argumento.
-- `"expired-callback"`: función que Google llama cuando el token caduca (los tokens de reCAPTCHA v2 duran aproximadamente 2 minutos).
-
-**Qué pasa cuando el usuario completa el reCAPTCHA:**
-
-1. Google llama a `callback(token)`.
-2. El token se escribe en `document.getElementById("g-recaptcha-response").value` — el input oculto del formulario que viajará al servidor en el POST.
-3. Se actualiza `window.__recaptchaVerified = true` — una bandera global por si `SubmitButton` ya estaba montado antes de que el evento llegara.
-4. Se dispara `window.dispatchEvent(new CustomEvent("recaptcha:verified", { detail: token }))` — el evento que `SubmitButton` escucha para activarse.
-
-**Qué pasa cuando el token caduca:**
-
-Google llama a `"expired-callback"`, que borra el valor del input oculto y dispara `recaptcha:expired`. `SubmitButton` vuelve a desactivarse, forzando al usuario a repetir la verificación.
-
-**La flag `cancelled`:**
-
-Protege contra condiciones de carrera en React Strict Mode o hot reload. Si el componente se desmonta antes de que `loadRecaptcha()` resuelva, `cancelled` evita que se intente renderizar el widget en un nodo que ya no está en el DOM.
-
----
-
-### 4.3 `index.astro` — el formulario y el input oculto
-
-**Ruta:** `src/pages/index.astro`
-
-Las partes relevantes para reCAPTCHA:
-
-```astro
----
-import Recaptcha from '../components/Recaptcha.jsx';
-import SubmitButton from '../components/SubmmitButton';
----
-
-<form method="POST" action={actions.enviarCorreo} enctype="multipart/form-data">
-
-  <!-- ... campos del formulario ... -->
-
-  <Recaptcha
-    client:only="react"
-    siteKey={import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY}
-  />
-  <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" />
-
-  <SubmitButton client:only="react" />
-
-</form>
-```
-
-**`client:only="react"`:**
-
-Astro renderiza los componentes en el servidor por defecto. `client:only="react"` le dice a Astro que este componente **solo debe ejecutarse en el navegador**, nunca en el servidor. Esto es correcto porque reCAPTCHA necesita acceso al DOM y a `window`, que no existen en el servidor.
-
-**`siteKey={import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY}`:**
-
-La site key se lee desde las variables de entorno de Astro y se pasa como prop al componente. Al tener el prefijo `PUBLIC_`, Astro la incluye en el bundle del cliente, haciéndola accesible en el navegador. Las variables sin ese prefijo no estarían disponibles aquí.
-
-**El input oculto:**
-
-```html
-<input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" />
-```
-
-Este campo es el puente entre el widget de reCAPTCHA (un componente React) y el formulario HTML estándar. Cuando `Recaptcha.jsx` obtiene un token, lo escribe en este input mediante `document.getElementById("g-recaptcha-response").value = token`. Al hacer submit, el navegador incluye este campo en el POST como cualquier otro campo del formulario.
-
-> El nombre `g-recaptcha-response` es el nombre estándar que Google espera en sus integraciones automáticas. En este proyecto lo usamos manualmente porque el widget se renderiza de forma explícita (`render=explicit`).
-
----
-
-### 4.4 `SubmmitButton.jsx` — el botón controlado por reCAPTCHA
-
-**Ruta:** `src/components/SubmmitButton.jsx`
-
-```jsx
-import { useEffect, useState } from "react";
-
-export default function SubmitButton() {
-  const [enabled, setEnabled] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (window.__recaptchaVerified) {
-      setEnabled(true);
-    }
-
-    const onVerified = () => setEnabled(true);
-    const onExpired = () => setEnabled(false);
-
-    window.addEventListener("recaptcha:verified", onVerified);
-    window.addEventListener("recaptcha:expired", onExpired);
-
-    return () => {
-      window.removeEventListener("recaptcha:verified", onVerified);
-      window.removeEventListener("recaptcha:expired", onExpired);
-    };
-  }, []);
-
-  // ...
-}
-```
-
-**Qué hace con reCAPTCHA:**
-
-`SubmitButton` no interactúa con la API de Google directamente. Solo escucha los eventos del DOM que dispara `Recaptcha.jsx`:
-
-- `recaptcha:verified` → activa el botón (`enabled = true`).
-- `recaptcha:expired` → vuelve a desactivarlo (`enabled = false`).
-
-**Por qué se comprueba `window.__recaptchaVerified` al montar:**
-
-Los dos componentes son islands React independientes que se montan en momentos distintos. Si `SubmitButton` se monta después de que el usuario ya completó el reCAPTCHA (lo que puede ocurrir en navegaciones SPA o rehydrataciones), el evento `recaptcha:verified` ya pasó y no se puede capturar. La bandera `window.__recaptchaVerified` cubre ese caso: al montar el botón, si la verificación ya ocurrió, se activa directamente sin esperar el evento.
-
-**Por qué el botón está desactivado por defecto:**
-
-El estado inicial es `enabled = false`. Esto garantiza que aunque el usuario manipule el DOM o deshabilite JavaScript parcialmente, el formulario no puede enviarse sin pasar por la verificación. La validación real ocurre en el servidor (siguiente sección), pero desactivar el botón mejora la experiencia de usuario al dar retroalimentación visual inmediata.
-
----
-
-### 4.5 `actions/index.ts` — verificación en el servidor
-
-**Ruta:** `src/actions/index.ts`
-
-```ts
-// Extraer el token del formulario
-const recaptchaToken = formData.get("g-recaptcha-response")?.toString() ?? "";
-
-// Verificar con la API de Google
-let recaptchaData: { success: boolean };
-try {
-  const recaptchaRes = await fetch(
-    "https://www.google.com/recaptcha/api/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `secret=${encodeURIComponent(import.meta.env.RECAPTCHA_SECRET)}&response=${encodeURIComponent(recaptchaToken)}`,
-    }
-  );
-  recaptchaData = await recaptchaRes.json();
-} catch (error) {
-  throw new ActionError({
-    code: "INTERNAL_SERVER_ERROR",
-    message: "Error al verificar reCAPTCHA",
-  });
-}
-
-// Rechazar si la verificación falló
-if (!recaptchaData.success) {
-  throw new ActionError({
-    code: "BAD_REQUEST",
-    message: "No se pudo verificar que seas humano",
-  });
-}
-```
-
-**Qué hace:**
-
-Este es el paso crítico de seguridad. El servidor extrae el token que viajó en el campo `g-recaptcha-response` del formulario POST y lo envía a la API de verificación de Google junto con la **secret key**.
-
-**La URL de verificación:**
+**Opciones de `grecaptcha.render()`:**
+
+| Opción | Tipo | Descripción |
+|---|---|---|
+| `sitekey` | string | Clave pública del sitio. Identifica el dominio ante Google. |
+| `size` | `"normal"` \| `"compact"` | Tamaño del widget. `compact` para pantallas estrechas. |
+| `callback` | function | Se llama cuando el usuario completa el reCAPTCHA. Recibe el token. |
+| `expired-callback` | function | Se llama cuando el token caduca (~2 minutos tras generarse). |
+| `error-callback` | function | Se llama si hay un error de red al verificar el challenge. |
+| `theme` | `"light"` \| `"dark"` | Color del widget. |
+| `tabindex` | number | Para navegación por teclado. |
+
+**Otros métodos del objeto `grecaptcha`** (no usados en este proyecto pero parte de la API):
+
+- `grecaptcha.reset(widgetId)` — resetea el widget manualmente sin esperar a que caduque.
+- `grecaptcha.getResponse(widgetId)` — obtiene el token actual sin usar el callback.
+- `grecaptcha.execute(widgetId)` — usado en v2 Invisible para lanzar el challenge programáticamente.
+
+### 3.2 API de servidor — `siteverify`
+
+Endpoint HTTP para validar el token desde el backend:
 
 ```
 POST https://www.google.com/recaptcha/api/siteverify
+Content-Type: application/x-www-form-urlencoded
 ```
 
-Con dos parámetros en el body:
+**Parámetros del body:**
 
-| Parámetro | Valor |
-|---|---|
-| `secret` | Tu `RECAPTCHA_SECRET` — la clave privada |
-| `response` | El token que el usuario envió en el formulario |
+| Parámetro | Requerido | Descripción |
+|---|---|---|
+| `secret` | sí | La clave secreta del sitio (solo servidor, nunca expuesta al cliente). |
+| `response` | sí | El token generado por el widget en el cliente. |
+| `remoteip` | no | IP del usuario. Si se incluye, Google la usa como señal adicional de verificación. |
 
-Google responde con un JSON del tipo:
+**Respuesta JSON:**
 
 ```json
-{ "success": true }
+{
+  "success": true,
+  "challenge_ts": "2024-01-15T10:30:00Z",
+  "hostname": "tudominio.com",
+  "error-codes": []
+}
 ```
 
-o en caso de error:
+En caso de fallo:
 
 ```json
 {
@@ -420,92 +114,171 @@ o en caso de error:
 }
 ```
 
-**Por qué esto es la verdadera barrera de seguridad:**
+**Códigos de error posibles:**
 
-La desactivación del botón en el cliente es una mejora de UX, no una barrera de seguridad. Cualquier usuario técnico puede hacer un `curl` directo al endpoint de la Action con datos arbitrarios, saltándose completamente el formulario y el widget. La verificación del servidor es la única garantía real: sin un token válido generado por Google para tu site key, la Action rechaza la petición con un error `BAD_REQUEST`.
+| Código | Significado |
+|---|---|
+| `missing-input-secret` | No se envió la clave secreta. |
+| `invalid-input-secret` | La clave secreta es incorrecta. |
+| `missing-input-response` | No se envió el token. |
+| `invalid-input-response` | El token está corrupto, ha caducado o ya fue usado. |
+| `bad-request` | La petición tiene un formato incorrecto. |
+| `timeout-or-duplicate` | El token se usó más de una vez o superó el tiempo de validez. |
 
-**`import.meta.env.RECAPTCHA_SECRET`:**
+### 3.3 El par de claves
 
-Al no tener el prefijo `PUBLIC_`, Astro nunca incluye esta variable en el bundle del cliente. Solo está disponible en código que se ejecuta en el servidor (como los Astro Actions). Si intentaras usarla en un componente `.jsx` con `client:only`, el valor sería `undefined`.
+El sistema usa dos claves con responsabilidades opuestas:
+
+| Clave | Variable en este proyecto | Dónde vive | Para qué sirve |
+|---|---|---|---|
+| **Site key** (pública) | `PUBLIC_RECAPTCHA_SITE_KEY` | Navegador | Renderizar el widget; identificar el dominio ante Google |
+| **Secret key** (privada) | `RECAPTCHA_SECRET` | Servidor | Verificar el token en `siteverify`; nunca debe exponerse al cliente |
+
+En Astro, el prefijo `PUBLIC_` hace que la variable sea accesible desde el bundle del cliente. Las variables sin ese prefijo son exclusivamente del servidor.
 
 ---
 
-## 5. Flujo completo del token
+## 4. Código: cómo se incorpora la API al proyecto
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  NAVEGADOR                                                          │
-│                                                                     │
-│  1. index.astro se renderiza                                        │
-│     └── pasa PUBLIC_RECAPTCHA_SITE_KEY como prop a Recaptcha.jsx   │
-│                                                                     │
-│  2. recaptchaLoader.js inserta el script de Google en el DOM       │
-│     └── URL: api.js?render=explicit                                 │
-│                                                                     │
-│  3. Recaptcha.jsx llama a grecaptcha.render()                      │
-│     └── con la siteKey recibida como prop                           │
-│     └── Google renderiza el checkbox "No soy un robot"             │
-│                                                                     │
-│  4. El usuario hace clic en el checkbox                             │
-│     └── Google ejecuta sus verificaciones internas                  │
-│     └── Google llama a callback(token)                              │
-│                                                                     │
-│  5. Recaptcha.jsx recibe el token                                   │
-│     ├── escribe el token en input#g-recaptcha-response             │
-│     ├── pone window.__recaptchaVerified = true                      │
-│     └── dispara CustomEvent("recaptcha:verified")                   │
-│                                                                     │
-│  6. SubmmitButton.jsx escucha "recaptcha:verified"                 │
-│     └── activa el botón de enviar                                   │
-│                                                                     │
-│  7. El usuario hace clic en "Enviar mensaje"                        │
-│     └── el formulario hace POST con todos los campos               │
-│         incluyendo g-recaptcha-response = <token>                   │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │  POST multipart/form-data
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  SERVIDOR (Astro Action — actions/index.ts)                         │
-│                                                                     │
-│  8. Se extrae el token del formData                                 │
-│     └── formData.get("g-recaptcha-response")                        │
-│                                                                     │
-│  9. Se verifica el token con Google                                 │
-│     └── POST https://www.google.com/recaptcha/api/siteverify       │
-│         ├── secret = RECAPTCHA_SECRET (clave privada del servidor)  │
-│         └── response = <token del usuario>                          │
-│                                                                     │
-│  10. Google responde { success: true } o { success: false }        │
-│                                                                     │
-│  11a. Si success = false → ActionError BAD_REQUEST                 │
-│       └── index.astro muestra alerta de error                       │
-│                                                                     │
-│  11b. Si success = true → continúa con el envío del correo         │
-│       └── index.astro muestra alerta de éxito                       │
-└─────────────────────────────────────────────────────────────────────┘
+El token viaja a través de cuatro archivos en orden. A continuación se describe cada uno con el fragmento relevante.
+
+### Paso 1 — Cargar el script de Google (`src/utils/recaptchaLoader.js`)
+
+En lugar de añadir un `<script>` en el HTML, el script se inserta dinámicamente. La promesa se guarda en `window._grecaptchaPromise` como singleton para evitar cargar el script dos veces si el componente se re-monta.
+
+```js
+export function loadRecaptcha() {
+  if (window._grecaptchaPromise) return window._grecaptchaPromise;
+
+  window._grecaptchaPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      window.grecaptcha.ready(() => resolve(window.grecaptcha));
+    };
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+
+  return window._grecaptchaPromise;
+}
 ```
 
----
-
-## 6. Por qué el token solo se usa una vez
-
-Los tokens de reCAPTCHA v2 tienen dos limitaciones de diseño importantes:
-
-**Expiración temporal:** Google invalida el token aproximadamente **2 minutos** después de que se generó. Si el usuario tarda mucho en enviar el formulario después de completar el reCAPTCHA, el token ya no será válido cuando llegue al servidor. Por eso existe el `expired-callback` en `Recaptcha.jsx`: Google avisa cuando el token caduca, el widget se resetea y el usuario debe completarlo de nuevo.
-
-**Uso único:** Una vez que el servidor envía el token a `api/siteverify` y Google responde `success: true`, ese token queda invalidado. No puede reutilizarse para enviar otro formulario. Esto impide que alguien intercepte el token de una petición legítima y lo reutilice en una petición automatizada.
+`render=explicit` impide que el script renderice el widget automáticamente al cargar, dando control total al componente React.
 
 ---
 
-## 7. Problemas frecuentes con reCAPTCHA
+### Paso 2 — Renderizar el widget y capturar el token (`src/components/Recaptcha.jsx`)
 
-| Síntoma | Causa probable | Solución |
-|---|---|---|
-| El widget no aparece, solo "Cargando validación..." | `PUBLIC_RECAPTCHA_SITE_KEY` no está definida o es incorrecta | Comprueba el `.env` y reinicia el servidor de desarrollo |
-| El widget carga pero el checkbox no funciona | `localhost` no está en los dominios autorizados en la consola de Google | Añade `localhost` en la consola de reCAPTCHA → tu sitio → configuración → Dominios |
-| Error "No se pudo verificar que seas humano" | `RECAPTCHA_SECRET` incorrecta, o el token llegó vacío al servidor | Comprueba que el input hidden `g-recaptcha-response` tiene valor al enviar (inspecciona el network tab) |
-| El botón de enviar nunca se activa | El evento `recaptcha:verified` no llega a `SubmitButton` | Abre la consola del navegador y comprueba si hay errores de JavaScript. Puede ser que el script de Google no cargó |
-| Error "invalid-input-response" de Google | El token llegó corrupto o vacío | El formulario se envió sin esperar al callback. Verifica que el input oculto tiene valor antes del submit |
-| El widget aparece dos veces | El script de Google se cargó dos veces | El singleton en `recaptchaLoader.js` previene esto; si ocurre, puede haber otro script de reCAPTCHA cargado manualmente en el Layout |
-| En producción funciona el widget pero falla la verificación | El dominio de producción no está en la consola de Google | Añade el dominio en la consola de reCAPTCHA (sin `https://`, solo el dominio) |
+El componente recibe la `siteKey` como prop y llama a `grecaptcha.render()` con los callbacks de verificación y caducidad.
+
+```jsx
+export default function Recaptcha({ siteKey }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    loadRecaptcha().then((grecaptcha) => {
+      grecaptcha.render(containerRef.current, {
+        sitekey: siteKey,
+        size: window.innerWidth < 550 ? "compact" : "normal",
+
+        callback: (token) => {
+          // Escribir el token en el input oculto del formulario
+          document.getElementById("g-recaptcha-response").value = token;
+          // Señalizar al botón de envío que la verificación fue exitosa
+          window.__recaptchaVerified = true;
+          window.dispatchEvent(new CustomEvent("recaptcha:verified", { detail: token }));
+        },
+
+        "expired-callback": () => {
+          document.getElementById("g-recaptcha-response").value = "";
+          window.__recaptchaVerified = false;
+          window.dispatchEvent(new CustomEvent("recaptcha:expired"));
+        },
+      });
+    });
+  }, [siteKey]);
+
+  return <div ref={containerRef} />;
+}
+```
+
+---
+
+### Paso 3 — Conectar el widget al formulario (`src/pages/index.astro`)
+
+El formulario incluye el componente React y un input oculto que actúa de puente entre el widget y el POST estándar del formulario.
+
+```astro
+<form method="POST" action={actions.enviarCorreo} enctype="multipart/form-data">
+
+  <!-- ... campos de texto ... -->
+
+  <!-- Widget reCAPTCHA (solo ejecuta en el navegador) -->
+  <Recaptcha
+    client:only="react"
+    siteKey={import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY}
+  />
+
+  <!-- El callback de Recaptcha.jsx escribe aquí el token -->
+  <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" />
+
+  <!-- El botón se activa cuando recibe el evento "recaptcha:verified" -->
+  <SubmitButton client:only="react" />
+
+</form>
+```
+
+`client:only="react"` indica a Astro que estos componentes solo se ejecutan en el navegador (reCAPTCHA necesita `window` y el DOM, que no existen en el servidor).
+
+---
+
+### Paso 4 — Verificar el token en el servidor (`src/actions/index.ts`)
+
+Esta es la barrera de seguridad real. El servidor extrae el token del POST y lo valida con `siteverify` antes de enviar el correo.
+
+```ts
+const recaptchaToken = formData.get("g-recaptcha-response")?.toString();
+
+const recaptchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: `secret=${process.env.RECAPTCHA_SECRET}&response=${recaptchaToken}`,
+});
+
+const recaptchaData = await recaptchaRes.json();
+
+if (!recaptchaData.success) {
+  throw new ActionError({ code: "BAD_REQUEST", message: "No se pudo verificar que seas humano" });
+}
+
+// Solo si success === true → enviar el correo con Nodemailer
+```
+
+La clave `RECAPTCHA_SECRET` (sin prefijo `PUBLIC_`) nunca llega al navegador. Si el token está vacío, caducado o ya fue usado, Google devuelve `success: false` y el servidor rechaza la petición antes de llegar al envío del correo.
+
+---
+
+### Flujo completo del token
+
+```
+NAVEGADOR
+  1. Recaptcha.jsx carga api.js con render=explicit
+  2. grecaptcha.render() muestra el checkbox
+  3. Usuario completa el reCAPTCHA
+  4. Google llama a callback(token)
+  5. token → input#g-recaptcha-response
+  6. CustomEvent "recaptcha:verified" → botón se activa
+  7. Usuario envía el formulario
+
+        POST multipart/form-data
+               ↓
+
+SERVIDOR (Astro Action)
+  8. Extrae token de formData.get("g-recaptcha-response")
+  9. POST a api/siteverify con secret + token
+ 10. Google responde { success: true/false }
+ 11. Si false → error | Si true → envía correo con Nodemailer
+```
